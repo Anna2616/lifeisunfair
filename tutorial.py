@@ -9,10 +9,10 @@ pygame.init()
 
 pygame.display.set_caption("Platformer")
 
-WIDTH, HEIGHT = 1000, 800
+block_size = 96
+WIDTH, HEIGHT = 2000, 800
 FPS = 60
 PLAYER_VEL = 5
-
 window = pygame.display.set_mode((WIDTH, HEIGHT))
 
 
@@ -60,7 +60,7 @@ class Player(pygame.sprite.Sprite):
     SPRITES = load_sprite_sheets("MainCharacters", "MaskDude", 32, 32, True)
     ANIMATION_DELAY = 3
 
-    def __init__(self, x, y, width, height):
+    def __init__(self, x, y, width, height, window, env):
         super().__init__()
         self.rect = pygame.Rect(x, y, width, height)
         self.x_vel = 0
@@ -72,6 +72,11 @@ class Player(pygame.sprite.Sprite):
         self.jump_count = 0
         self.hit = False
         self.hit_count = 0
+        self.window = window
+        self.question_count = 1
+        self.env = env 
+
+
 
     def jump(self):
         self.y_vel = -self.GRAVITY * 8
@@ -112,6 +117,7 @@ class Player(pygame.sprite.Sprite):
         self.fall_count += 1
         self.update_sprite()
 
+
     def landed(self):
         self.fall_count = 0
         self.y_vel = 0
@@ -121,10 +127,15 @@ class Player(pygame.sprite.Sprite):
         self.count = 0
         self.y_vel *= -1
 
+        
+#prompt script
     def update_sprite(self):
         sprite_sheet = "idle"
         if self.hit:
-            sprite_sheet = "hit"
+            sprite_sheet = "hit" 
+            bg_image = self.address_image()
+            draw_prompt(bg_image)
+            
         elif self.y_vel < 0:
             if self.jump_count == 1:
                 sprite_sheet = "jump"
@@ -143,6 +154,19 @@ class Player(pygame.sprite.Sprite):
         self.animation_count += 1
         self.update()
 
+    def address_image(self):
+        image = pygame.image.load(join("assets","Questions",str(self.env) + "." + str(self.question_count) +".png"))
+        info = pygame.display.Info()
+        image = pygame.transform.scale(image,(info.current_w,info.current_h))
+        return image
+
+    
+    def draw_prompt(self, bg_image):
+        if self.env !=0:
+            self.window.blit(bg_image ,(self.rect.left,self.rect.top))
+            print("yes")
+        
+
     def update(self):
         self.rect = self.sprite.get_rect(topleft=(self.rect.x, self.rect.y))
         self.mask = pygame.mask.from_surface(self.sprite)
@@ -150,6 +174,11 @@ class Player(pygame.sprite.Sprite):
     def draw(self, win, offset_x):
         win.blit(self.sprite, (self.rect.x - offset_x, self.rect.y))
 
+def draw_prompt(bg_image):
+    window.blit(bg_image ,(200,200))
+        #for event in pygame.event.get():
+        #    if event.type == pygame.QUIT:
+        #        run = False 
 
 class Object(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height, name=None):
@@ -208,6 +237,8 @@ def draw_background(name):
     image = pygame.transform.scale(image,(info.current_w,info.current_h))
     return image
 
+#def draw_prompt(window, bg_image):
+#    window.blit(bg_image, (0,0))
 
 def draw(window, bg_image, player, objects, offset_x):
 
@@ -257,7 +288,7 @@ def handle_move(player, objects):
     player.x_vel = 0
     collide_left = collide(player, objects, -PLAYER_VEL * 2)
     collide_right = collide(player, objects, PLAYER_VEL * 2)
-
+    
     if ( keys[pygame.K_LEFT] or keys[pygame.K_a] ) and not collide_left:
         player.move_left(PLAYER_VEL)
     if (keys[pygame.K_RIGHT] or keys[pygame.K_d]) and not collide_right:
@@ -270,28 +301,62 @@ def handle_move(player, objects):
         if obj and obj.name == "fire":
             player.make_hit()
 
+#def choose_env(player):
+def fire_on(fire):
+    for i in fire:
+        i.on()
 
+
+def fire_loop(fire):
+    for i in fire:
+        i.loop()
+
+def choose_env(player, x, env):
+    pos_right = player.rect.right
+    pos_left = player.rect.left
+    if pos_left > x and pos_right < (x + block_size):
+        env = 1
+        return "desert.png", 1 
+    if pos_left > (x + 3 * block_size) and pos_right < (x + 4 * block_size):
+        env = 2
+        return "volcano.png", 2 
+    if pos_left > (x + 6 * block_size)  and pos_right < (x + 7 * block_size):
+        env = 3
+        return "mill.png", 3 
+    if pos_left > (x + 9 * block_size) and pos_right < (x + 10 * block_size):
+        env = 4
+        return "water.png", 4
+    return "wave.png", env
 def main(window):
     clock = pygame.time.Clock()
-
-    block_size = 96
-
-    player = Player(100, 100, 50, 50)
-    fire = Fire(100, HEIGHT - block_size - 64, 16, 32)
-    fire.on()
+    
+    env =3 
+    IMAGE_ADDR = "desert.png"
+    player = Player(100, 100, 50, 50, window, env)
+    fire = [Fire(900*i, HEIGHT - block_size - 64, 16, 32)for i in range(1,4)]
+    fire_on(fire) 
     floor = [Block(i * block_size, HEIGHT - block_size, block_size)
              for i in range(-WIDTH // block_size, (WIDTH * 2) // block_size)]
-    objects = [*floor, Block(0, HEIGHT - block_size * 2, block_size),
-               Block(block_size * 3, HEIGHT - block_size * 4, block_size), fire]
-
+    a1=floor[29]
+    a2=floor[23]
+    a3=floor[25]
+    a4=floor[27]
+    #objects = [*floor, Block(0, HEIGHT - block_size * 2, block_size),
+    #           Block(block_size * 3, HEIGHT - block_size * 4, block_size), fire]
+    objects = [*floor]
+    del objects[23]
+    del objects[25]
+    del objects[27]
+    del objects[29]
+    x = floor[23].rect.left
     offset_x = 0
     scroll_area_width = 200
-
+    
     run = True
     prevdim = HEIGHT,WIDTH
     while run:
         clock.tick(FPS)
-        bg_image = draw_background("desert.png")
+        bg_image = draw_background(IMAGE_ADDR)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -303,13 +368,50 @@ def main(window):
                     player.jump()
 
         player.loop(FPS)
-        fire.loop()
+        fire_loop(fire)
+        handle_move(player, objects)
+        draw(window, bg_image, player, objects, offset_x)
+        #here1
+        #if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
+#                (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
+#            offset_x += player.x_vel
+        if (player.rect.left < 0 or player.rect.right > WIDTH):
+            player.x_vel*=-1
+        if ((player.rect.bottom > HEIGHT - block_size +10)):
+            player.rect.top = 0
+            player.rect.bottom=50
+            run = False
+    
+    IMAGE_ADDR ,env = choose_env(player, x, env)
+    objects = [*floor,Block(0, HEIGHT - block_size * 2, block_size),
+    Block(block_size * 3, HEIGHT - block_size * 4, block_size),*fire,a1,a2,a3,a4]
+    run = True
+    while run:
+        clock.tick(FPS)
+        bg_image = draw_background(IMAGE_ADDR)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+                break
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE and player.jump_count < 2:
+                    player.jump()
+
+        player.loop(FPS)
+        fire_loop(fire)
         handle_move(player, objects)
         draw(window, bg_image, player, objects, offset_x)
 
         if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
                 (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
             offset_x += player.x_vel
+        if ((player.rect.bottom > HEIGHT - block_size +10)):
+            player.rect.top = 0
+            player.rect.bottom=50
+            run = False 
+            
 
     pygame.quit()
     quit()
